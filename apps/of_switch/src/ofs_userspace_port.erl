@@ -284,11 +284,18 @@ init({OfsPortNo, ConfigOpts}) ->
                                     [public,
                                      {read_concurrency, true},
                                      {keypos, #ofs_queue_throttling.queue_no}]),
+            HwAddr = case inet:ifget(Interface, [hwaddr]) of
+                         [] ->
+                             undefined;
+                         {ok, [{hwaddr, [M1, M2, M3, M4, M5, M6]}]} ->
+                             << M1, M2, M3, M4, M5, M6 >>
+                     end,
             OfsPort = #ofs_port{number = OfsPortNo,
                                 type = physical,
                                 pid = self(),
                                 iface = Interface,
-                                port = #ofp_port{port_no = OfsPortNo}},
+                                port = #ofp_port{port_no = OfsPortNo,
+                                                 hw_addr = HwAddr}},
             ets:insert(ofs_ports, OfsPort),
             ets:insert(port_stats, #ofp_port_stats{port_no = OfsPortNo}),
             State1 = State#state{interface = Interface,
