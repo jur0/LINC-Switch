@@ -288,7 +288,7 @@ init({OfsPortNo, ConfigOpts}) ->
                          [] ->
                              undefined;
                          {ok, [{hwaddr, [M1, M2, M3, M4, M5, M6]}]} ->
-                             << M1, M2, M3, M4, M5, M6 >>
+                             <<M1, M2, M3, M4, M5, M6>>
                      end,
             OfsPort = #ofs_port{number = OfsPortNo,
                                 type = physical,

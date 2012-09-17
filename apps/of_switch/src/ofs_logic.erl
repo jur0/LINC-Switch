@@ -360,11 +360,29 @@ get_mac_address() ->
                   Addr /= undefined],
     case lists:keysort(1, HwAddrs) of
         %% If there are no network interfaces used by the switch, pick the first
-        %% with hw address
+        %% interface with the hw address present in the system
         [] ->
-            % TODO
-            error;
-        %% Pick the first interface
+            {ok, Ifs}  = inet:getifaddrs(),
+            HwAddrs2 = lists:map(fun({_, Opts}) -> hwaddr(Opts) end, Ifs),
+            case lists:filter(fun (undefined) -> false;
+                                  (_) -> true end,
+                              HwAddrs2) of
+                %% No mac addresses in the system
+                [] ->
+                    %% TODO
+                    erorr;
+                [Addr | _] ->
+                    Addr
+            end;
+        %% Pick the first interface with the hw address used by the switch
         [{_, Addr} | _] ->
             Addr
     end.
+
+-spec hwaddr(list()) -> binary() | undefined.
+hwaddr([]) ->
+    undefined;
+hwaddr([{hwaddr, [M1, M2, M3, M4, M5, M6]} | _]) ->
+    <<M1, M2, M3, M4, M5, M6>>;
+hwaddr([_ | Rest]) ->
+    hwaddr(Rest).
