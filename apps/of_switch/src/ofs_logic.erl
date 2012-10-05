@@ -83,7 +83,7 @@ init([BackendMod, BackendOpts]) ->
     {ok, BackendState} = BackendMod:start(BackendOpts),
     {ok, #state{backend_mod = BackendMod,
                 backend_state = BackendState,
-                datapath_mac = get_mac_address()}}.
+                datapath_mac = get_ifhwaddr()}}.
 
 handle_call({get_connection, Pid}, _From,
             #state{connections = Connections} = State) ->
@@ -172,8 +172,8 @@ handle_message(#ofp_message{body = #ofp_error{type = hello_failed}},
 handle_message(#ofp_message{body = #ofp_features_request{}} = Request,
                #connection{socket = Socket},
                #state{datapath_mac = DatapathMac} = State) ->
-    FeaturesReply = #ofp_features_reply{datapath_id = 0,
-                                        datapath_mac = DatapathMac,
+    FeaturesReply = #ofp_features_reply{datapath_mac = DatapathMac,
+                                        datapath_id = 0,
                                         n_buffers = 0,
                                         n_tables = 255},
     send_reply(Socket, Request, FeaturesReply),
@@ -351,31 +351,18 @@ do_send(Socket, Message) ->
 send_reply(Socket, Request, ReplyBody) ->
     do_send(Socket, Request#ofp_message{body = ReplyBody}).
 
--spec get_mac_address() -> binary().
-get_mac_address() ->
-    Ports = ets:tab2list(ofs_ports),
-    HwAddrs = [{PortNo, Addr} ||
-                  {ofs_port, _, _, _, _,
-                   {ofp_port, PortNo, Addr, _, _, _, _, _, _, _, _, _}} <- Ports,
-                  Addr /= undefined],
-    case lists:keysort(1, HwAddrs) of
-        %% If there are no network interfaces used by the switch, pick the first
-        %% interface with the hw address present in the system
+-spec get_ifhwaddr() -> binary().
+get_ifhwaddr() ->
+    {ok, Ifs}  = inet:getifaddrs(),
+    HwAddrs = lists:map(fun({_, Opts}) -> hwaddr(Opts) end, Ifs),
+    case lists:filter(fun (undefined) -> false;
+                          (_) -> true end,
+                      HwAddrs) of
+        %% No mac addresses in the system
         [] ->
-            {ok, Ifs}  = inet:getifaddrs(),
-            HwAddrs2 = lists:map(fun({_, Opts}) -> hwaddr(Opts) end, Ifs),
-            case lists:filter(fun (undefined) -> false;
-                                  (_) -> true end,
-                              HwAddrs2) of
-                %% No mac addresses in the system
-                [] ->
-                    %% TODO
-                    erorr;
-                [Addr | _] ->
-                    Addr
-            end;
-        %% Pick the first interface with the hw address used by the switch
-        [{_, Addr} | _] ->
+            %% TODO
+            erorr;
+        [Addr | _] ->
             Addr
     end.
 
